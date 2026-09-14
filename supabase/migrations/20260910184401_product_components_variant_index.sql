@@ -1,1 +1,0 @@
-create index product_components_variant_org_idx on public.product_components(product_variant_id,organization_id);

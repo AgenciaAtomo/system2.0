@@ -1,3 +1,0 @@
-create index finished_stock_variant_org_idx on public.finished_stock(variant_id,organization_id);
-create index purchase_financial_entry_org_idx on public.purchase_financial_links(entry_id,organization_id);
-create index purchase_financial_purchase_org_idx on public.purchase_financial_links(purchase_id,organization_id);
