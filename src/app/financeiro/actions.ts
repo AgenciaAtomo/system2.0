@@ -15,7 +15,10 @@ export async function saveCatalog(_previous:{message:string},form:FormData):Prom
  if(row.operation==="save"){
   if(!row.name.trim())return {message:"Informe um nome."};
   payload.name=row.name.trim();
-  if(row.kind==="account"&&!row.id){payload.type=row.type;try{payload.opening_balance=parseMoney(row.opening_balance);}catch{return {message:"Informe um saldo válido, como 1.250,90."};}}
+  if(row.kind==="account"){
+   payload.type=row.type;
+   if(!row.id){try{payload.opening_balance=parseMoney(row.opening_balance);}catch{return {message:"Informe um saldo válido, como 1.250,90."};}}
+  }
   if(row.kind==="category"){payload.type=row.type;if(row.parent_id)payload.parent_id=row.parent_id;}
  }
  const {error}=await client.rpc("save_financial_catalog",{org:organizationId,request_id:row.request_id,payload});
@@ -25,5 +28,6 @@ export async function saveCatalog(_previous:{message:string},form:FormData):Prom
   return {message:"Não foi possível salvar. Confira seu acesso e tente novamente."};
  }
  revalidatePath("/financeiro");revalidatePath("/");
- redirect("/financeiro?kind="+row.kind+"&saved=1");
+ const saved=row.operation==="archive"?(row.kind==="account"?"deleted":"archived"):row.id?"updated":"created";
+ redirect("/financeiro?kind="+row.kind+"&saved="+saved);
 }
