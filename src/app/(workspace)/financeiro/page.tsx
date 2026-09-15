@@ -9,7 +9,7 @@ import {Pencil} from "lucide-react";
 export const dynamic="force-dynamic";
 const labels={account:"Contas financeiras",category:"Categorias",cost_center:"Centros de custo"};
 const types:Record<string,string>={bancaria:"Conta bancária",corrente:"Conta corrente",poupanca:"Poupança",cartao_prepago:"Cartão pré-pago",carteira:"Carteira",caixa:"Caixa",marketplace:"Marketplace",digital:"Conta digital",receita:"Receita",despesa:"Despesa",ambos:"Receita e despesa"};
-const savedMessages:Record<string,string>={created:"Cadastro criado.",updated:"Cadastro atualizado.",archived:"Cadastro arquivado.",deleted:"Conta excluída. O histórico financeiro foi preservado.",1:"Cadastro salvo. A alteração foi registrada no histórico."};
+const savedMessages:Record<string,string>={created:"Cadastro criado.",updated:"Cadastro atualizado.",archived:"Cadastro arquivado.",deleted:"Conta excluída com os registros financeiros vinculados.",1:"Cadastro salvo. A alteração foi registrada no histórico."};
 export default async function Finance({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
  const params=await searchParams;const kind=catalogKind.catch("account").parse(params.kind);
  const page=Math.min(100000,Math.max(1,Number.parseInt(params.page??"1",10)||1)),search=(params.q??"").slice(0,100);

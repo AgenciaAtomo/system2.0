@@ -11,6 +11,8 @@ do $test$ declare actor uuid; org uuid; account uuid; cat uuid; child uuid; cent
  begin perform public.save_financial_catalog(org,gen_random_uuid(),'{"kind":"account","name":"invalid","type":"bancaria","opening_balance":"0.001"}'); raise exception 'fraction cents accepted'; exception when invalid_parameter_value then null; end;
  perform public.save_financial_catalog(org,gen_random_uuid(),jsonb_build_object('kind','account','id',account,'name','Teste temporário editado','type','digital'));
  if not exists(select 1 from public.contas_bancarias where id=account and nome='Teste temporário editado' and tipo='digital' and ativa) then raise exception 'account edit failed'; end if;
+ if (select saldo_inicial from public.contas_bancarias where id=account)<>123.45 then raise exception 'money failed'; end if;
+ if jsonb_typeof(public.get_financial_catalog(org,'account','Teste',1)->'items'->0->'opening_balance')<>'string' then raise exception 'decimal transport failed'; end if;
  cat=public.save_financial_catalog(org,gen_random_uuid(),'{"kind":"category","name":"Pai temporário","type":"despesa"}');
  child=public.save_financial_catalog(org,gen_random_uuid(),jsonb_build_object('kind','category','name','Filho temporário','type','despesa','parent_id',cat));
  begin perform public.save_financial_catalog(org,gen_random_uuid(),jsonb_build_object('kind','category','id',cat,'name','Pai temporário','type','despesa','parent_id',child)); raise exception 'cycle accepted'; exception when invalid_parameter_value then null; end;
@@ -18,11 +20,9 @@ do $test$ declare actor uuid; org uuid; account uuid; cat uuid; child uuid; cent
  perform public.save_financial_catalog(org,gen_random_uuid(),jsonb_build_object('kind','cost_center','operation','archive','id',center));
  if (select active from public.cost_centers where id=center) then raise exception 'archive failed'; end if;
  perform public.save_financial_catalog(org,gen_random_uuid(),jsonb_build_object('kind','account','operation','archive','id',account));
- if exists(select 1 from public.contas_bancarias where id=account and (ativa or deletada_em is null)) then raise exception 'account delete failed'; end if;
- if (select saldo_inicial from public.contas_bancarias where id=account)<>123.45 then raise exception 'money failed'; end if;
- if jsonb_typeof(public.get_financial_catalog(org,'account','Teste',1)->'items'->0->'opening_balance')<>'string' then raise exception 'decimal transport failed'; end if;
+ if exists(select 1 from public.contas_bancarias where id=account) then raise exception 'account delete failed'; end if;
  if (public.get_financial_catalog(org,'account','%',1)->>'total')::int<>0 then raise exception 'search wildcard not escaped'; end if;
- select count(*) into n from public.audit_logs where entity_id=account::text and domain='financial'; if n<>3 then raise exception 'audit or retry duplicated'; end if;
+ select count(*) into n from public.audit_logs where entity_id=account::text and domain='financial'; if n<>2 then raise exception 'audit or retry duplicated'; end if;
  execute 'reset role';
  update public.user_roles set role_id='viewer' where organization_id=org and user_id=actor;
  execute 'set local role authenticated';

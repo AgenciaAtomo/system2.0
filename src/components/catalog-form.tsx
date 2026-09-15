@@ -20,7 +20,7 @@ export function CatalogForm({kind,requestId,record,parents}:Props){
 export function ArchiveCatalog({kind,record,requestId}:{kind:CatalogKind;record:CatalogRow;requestId:string}){
  const [state,action,pending]=useActionState(saveCatalog,{message:""});
  const isAccount=kind==="account";
- return <form action={action} onSubmit={event=>{if(!window.confirm((isAccount?"Excluir ":"Arquivar ")+record.name+"? O histórico será preservado."))event.preventDefault();}}>
+ return <form action={action} onSubmit={event=>{const message=isAccount?`Excluir ${record.name}? Os lançamentos, baixas e extratos ligados a esta conta também serão apagados.`:`Arquivar ${record.name}? O histórico será preservado.`;if(!window.confirm(message))event.preventDefault();}}>
  <input type="hidden" name="kind" value={kind}/><input type="hidden" name="request_id" value={requestId}/><input type="hidden" name="id" value={record.id}/><input type="hidden" name="operation" value="archive"/>
  <Button variant="outline" size="sm" disabled={pending} type="submit"><Trash2 size={14} aria-hidden="true"/>{isAccount?"Excluir":"Arquivar"}</Button>{state.message&&<p role="alert" className="mt-2 text-sm text-red-700">{state.message}</p>}
  </form>;
