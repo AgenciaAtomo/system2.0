@@ -1,0 +1,38 @@
+import {createClient} from '@supabase/supabase-js';
+import assert from 'node:assert/strict';
+const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const make=()=>createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+const anon=make(),client=make();
+const login=await client.auth.signInWithPassword({email:process.env.BE_TEST_EMAIL,password:process.env.BE_TEST_PASSWORD});
+assert.equal(login.error,null,'real account login');
+const {data:orgs,error:orgError}=await client.from('organizations').select('id,name');
+assert.equal(orgError,null);assert.equal(orgs.length,1);
+const org=orgs[0].id;
+for(const table of ['empresas','usuarios','transacoes','organizations','audit_logs','attachments']){
+ const r=await anon.from(table).select('*',{head:true,count:'exact'});
+ assert.ok(r.error||r.count===0,'anonymous blocked: '+table);
+}
+const legacy=await client.from('usuarios').select('id');assert.ok(legacy.error,'legacy passwords table inaccessible');
+const tx=await client.from('transacoes').select('id',{count:'exact'});assert.equal(tx.count,2);
+const escalation=await client.from('user_roles').insert({organization_id:org,user_id:login.data.user.id,role_id:'viewer'});
+assert.ok(escalation.error,'direct role mutation denied');
+const id=crypto.randomUUID(),path=org+'/'+id;
+const deniedUpload=await anon.storage.from('be-organization-documents').upload(path,Buffer.from('invalid'),{contentType:'application/pdf'});
+assert.ok(deniedUpload.error,'anonymous upload blocked');
+const noMetadata=await client.storage.from('be-organization-documents').upload(path,Buffer.from('invalid'),{contentType:'application/pdf'});
+assert.ok(noMetadata.error,'path prefix alone does not authorize uploads');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jOxoAAAAASUVORK5CYII=','base64');
+const insert=await client.from('attachments').insert({id,organization_id:org,bucket_id:'be-organization-documents',object_path:path,original_name:'Verificação técnica do armazenamento privado.png',mime_type:'image/png',size_bytes:png.length,created_by:login.data.user.id,entity_type:'organization',entity_id:org});
+assert.equal(insert.error,null,'prepare authorized attachment');
+const premature=await client.rpc('confirm_attachment',{attachment_id:id});assert.ok(premature.error,'missing file cannot be confirmed');
+const upload=await client.storage.from('be-organization-documents').upload(path,png,{contentType:'image/png',upsert:false});assert.equal(upload.error,null,'authorized upload');
+const confirm=await client.rpc('confirm_attachment',{attachment_id:id});assert.equal(confirm.error,null,'confirmation');
+assert.equal((await client.rpc('confirm_attachment',{attachment_id:id})).error,null,'idempotent confirmation');
+assert.equal((await client.storage.from('be-organization-documents').download(path)).error,null,'authorized download');
+assert.ok((await anon.storage.from('be-organization-documents').download(path)).error,'anonymous direct file access blocked');
+assert.ok((await client.storage.from('be-organization-documents').upload(path,png,{contentType:'image/png',upsert:true})).error,'overwrite denied');
+const removed=await client.storage.from('be-organization-documents').remove([path]);
+assert.ok(removed.error||removed.data?.length===0,'preserved object deletion denied');
+assert.equal((await client.storage.from('be-organization-documents').download(path)).error,null,'object still exists');
+console.log(JSON.stringify({result:'PASS',checks:18,artifact:id,note:'Imagem técnica de 1 pixel, sem dados financeiros; preservada como evidência de teste.'}));
+await client.auth.signOut({scope:'local'});
