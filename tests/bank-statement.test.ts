@@ -15,6 +15,15 @@ test("CSV com colunas débito e crédito usa o lado preenchido",()=>{
  assert.deepEqual(rows.map(row=>row.type),["despesa","receita"]);
  assert.deepEqual(rows.map(row=>row.amount),["88.10","120.00"]);
 });
+test("CSV do Mercado Pago ignora resumo inicial e lê movimentações",()=>{
+ const rows=parseBankStatementFile("account_statement.csv","INITIAL_BALANCE;CREDITS;DEBITS;FINAL_BALANCE\n0,00;50,00;0,00;50,00\n\nRELEASE_DATE;TRANSACTION_TYPE;REFERENCE_ID;TRANSACTION_NET_AMOUNT;PARTIAL_BALANCE\n08-07-2026;Liberação parcial de garantia ;117197753485;50,00;50,00");
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].date,"2026-07-08");
+ assert.equal(rows[0].description,"Liberação parcial de garantia");
+ assert.equal(rows[0].amount,"50.00");
+ assert.equal(rows[0].type,"receita");
+ assert.equal(rows[0].reference,"117197753485");
+});
 test("OFX usa FITID, data postada e sinal do valor",()=>{
  const rows=parseBankStatementFile("extrato.ofx","<OFX><BANKTRANLIST><STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260914000000<TRNAMT>-45.67<FITID>XYZ1<NAME>Conta internet</STMTTRN></BANKTRANLIST></OFX>");
  assert.equal(rows[0].date,"2026-09-14");

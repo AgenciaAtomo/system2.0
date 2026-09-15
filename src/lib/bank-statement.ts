@@ -12,13 +12,13 @@ export const bankStatementRow=z.object({
 export type BankStatementRow=z.infer<typeof bankStatementRow>;
 
 const aliases={
- date:["date","data","datamovimento","datadomovimento","posteddate","dtposted","dtmovimento"],
- description:["description","descricao","descrição","historico","histórico","lancamento","lançamento","memo","nome","title"],
- amount:["amount","valor","value","valorlancamento","valorlançamento","valorbruto"],
+ date:["date","data","datamovimento","datadomovimento","posteddate","dtposted","dtmovimento","release_date","releasedate"],
+ description:["description","descricao","descrição","historico","histórico","lancamento","lançamento","memo","nome","title","transaction_type","transactiontype"],
+ amount:["amount","valor","value","valorlancamento","valorlançamento","valorbruto","transaction_net_amount","transactionnetamount","netamount"],
  debit:["debito","débito","saida","saída","withdrawal","debit"],
  credit:["credito","crédito","entrada","deposit","credit"],
  type:["type","tipo","natureza"],
- reference:["reference","referencia","referência","id","identificador","documento","doc","fitid"],
+ reference:["reference","referencia","referência","id","identificador","documento","doc","fitid","reference_id","referenceid"],
 };
 
 function normalizeHeader(value:string){
@@ -30,6 +30,20 @@ export function normalizeStatementDescription(value:string){
 function column(headers:string[],names:string[]){
  const normalized=headers.map(normalizeHeader);
  return names.map(normalizeHeader).map(name=>normalized.indexOf(name)).find(index=>index>=0)??-1;
+}
+function csvIndexes(headers:string[]){
+ return {
+  date:column(headers,aliases.date),
+  description:column(headers,aliases.description),
+  amount:column(headers,aliases.amount),
+  debit:column(headers,aliases.debit),
+  credit:column(headers,aliases.credit),
+  type:column(headers,aliases.type),
+  reference:column(headers,aliases.reference),
+ };
+}
+function hasTransactionColumns(indexes:ReturnType<typeof csvIndexes>){
+ return indexes.date>=0&&indexes.description>=0&&(indexes.amount>=0||(indexes.debit>=0&&indexes.credit>=0));
 }
 function directionFromText(value:string):"receita"|"despesa"|null{
  const text=value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
@@ -51,18 +65,10 @@ function parseSignedAmount(value:string,typeHint:"receita"|"despesa"|null){
 function parseCsvStatement(source:string){
  const table=parseCSV(source);
  if(table.length<2)throw new Error("O arquivo precisa ter cabeçalho e ao menos uma linha de extrato.");
- const headers=table[0];
- const indexes={
-  date:column(headers,aliases.date),
-  description:column(headers,aliases.description),
-  amount:column(headers,aliases.amount),
-  debit:column(headers,aliases.debit),
-  credit:column(headers,aliases.credit),
-  type:column(headers,aliases.type),
-  reference:column(headers,aliases.reference),
- };
- if(indexes.date<0||indexes.description<0||(indexes.amount<0&&(indexes.debit<0||indexes.credit<0)))throw new Error("Associe colunas de data, descrição e valor. Também aceito débito/crédito separados.");
- return table.slice(1).map((cells,index)=>{
+ const headerIndex=table.findIndex(row=>hasTransactionColumns(csvIndexes(row)));
+ if(headerIndex<0)throw new Error("Associe colunas de data, descrição e valor. Também aceito débito/crédito separados.");
+ const indexes=csvIndexes(table[headerIndex]);
+ return table.slice(headerIndex+1).map((cells,index)=>{
   const typeHint=indexes.type>=0?directionFromText(cells[indexes.type]??""):null;
   let parsed:{amount:string;type:"receita"|"despesa"}|null=null;
   if(indexes.amount>=0&&cells[indexes.amount]){
@@ -73,7 +79,7 @@ function parseCsvStatement(source:string){
    if(credit.trim())parsed={amount:parseMoney(cleanAmount(credit)),type:"receita"};
    else if(debit.trim())parsed={amount:parseMoney(cleanAmount(debit)),type:"despesa"};
   }
-  if(!parsed)throw new Error(`Linha ${index+2}: informe valor de entrada ou saída.`);
+  if(!parsed)throw new Error(`Linha ${headerIndex+index+2}: informe valor de entrada ou saída.`);
   const row=bankStatementRow.parse({
    date:normalizedDate(cells[indexes.date]??""),
    description:(cells[indexes.description]??"").trim(),

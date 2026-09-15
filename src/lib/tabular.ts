@@ -5,7 +5,7 @@ export function parseCSV(source:string):string[][]{
  if(quoted)throw new Error('CSV com aspas incompletas.');row.push(cell.trim());if(row.some(Boolean))rows.push(row);if(rows.length>5001)throw new Error('Importe até 5.000 linhas por arquivo.');return rows;
 }
 export function normalizedNumber(value:string){const s=value.trim().replace(/^R\$\s*/,'').replace(/\s/g,'');if(s.includes(','))return s.replaceAll('.','').replace(',','.');return s;}
-export function normalizedDate(value:string){const s=value.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;if(/^\d{2}\/\d{2}\/\d{4}$/.test(s))return s.split('/').reverse().join('-');if(/^\d{5}(\.0+)?$/.test(s)){const date=new Date(Date.UTC(1899,11,30)+Number(s)*86400000);return date.toISOString().slice(0,10);}return s;}
+export function normalizedDate(value:string){const s=value.trim();if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;if(/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(s)){const [day,month,year]=s.split(/[/-]/);return `${year}-${month}-${day}`;}if(/^\d{5}(\.0+)?$/.test(s)){const date=new Date(Date.UTC(1899,11,30)+Number(s)*86400000);return date.toISOString().slice(0,10);}return s;}
 export function mappedRows(rows:string[][],mapping:Record<string,string>){return rows.slice(1).map(cells=>Object.fromEntries(Object.entries(mapping).filter(([,index])=>index!=='').map(([key,index])=>[key,cells[Number(index)]??''])));}
 // XLSX is a ZIP of XML worksheets. Read cell values only, never execute formulas/macros.
 export async function readXLSX(buffer:ArrayBuffer):Promise<string[][]>{
